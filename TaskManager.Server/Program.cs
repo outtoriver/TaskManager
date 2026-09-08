@@ -115,6 +115,9 @@ public class Program
         builder.Services.AddScoped<IPositionService, PositionService>();
         builder.Services.AddScoped<IRoleService, RoleService>();
         builder.Services.AddScoped<IUserRoleService, UserRoleService>();
+        builder.Services.AddScoped<ILocalAccountService, LocalAccountService>();
+
+        builder.Services.AddScoped<AuthenticationBootstrapService>();
 
         builder.Services.AddScoped<
             IAppAuthenticationService,
