@@ -3,6 +3,8 @@ using TaskManager.Server.Data;
 using TaskManager.Server.Features.Users.Services;
 using TaskManager.Server.Features.Departments.Services;
 using TaskManager.Server.Features.Positions.Services;
+using TaskManager.Server.Authorization;
+using TaskManager.Server.Features.Roles.Services;
 
 namespace TaskManager.Server;
 
@@ -32,6 +34,8 @@ public class Program
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IDepartmentService, DepartmentService>();
         builder.Services.AddScoped<IPositionService, PositionService>();
+        builder.Services.AddPermissionAuthorization();
+        builder.Services.AddScoped<IRoleService, RoleService>();
 
         // ============================================
         // Application

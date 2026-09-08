@@ -1,6 +1,6 @@
-﻿namespace TaskManager.Server.Features.Roles.DTOs
+﻿namespace TaskManager.Server.Features.Roles.DTOs;
+
+public class UpdateRolePermissionsRequest
 {
-    public class UpdateRolePermissionsRequest
-    {
-    }
+    public IReadOnlyCollection<int> PermissionIds { get; set; } = [];
 }
