@@ -30,6 +30,7 @@ public class UserDetailsDto
 
     public DateTime? LastLoginAt { get; set; }
 
-    public IReadOnlyCollection<UserListItemDto> Subordinates { get; set; }
-        = [];
+    public IReadOnlyCollection<UserRoleDto> Roles { get; set; } = [];
+
+    public IReadOnlyCollection<UserListItemDto> Subordinates { get; set; } = [];
 }

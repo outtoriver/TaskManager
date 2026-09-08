@@ -41,10 +41,10 @@ public class UserService(ApplicationDbContext db)
     }
 
     public async Task<UserDetailsDto?> GetByIdAsync(
-    int id,
-    CancellationToken cancellationToken = default)
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var user = await db.Users
+        return await db.Users
             .AsNoTracking()
             .Where(x => x.Id == id)
             .Select(x => new UserDetailsDto
@@ -74,7 +74,19 @@ public class UserService(ApplicationDbContext db)
                 CreatedAt = x.CreatedAt,
                 LastLoginAt = x.LastLoginAt,
 
+                Roles = x.UserRoles
+                    .OrderBy(r => r.Role.Name)
+                    .Select(r => new UserRoleDto
+                    {
+                        Id = r.Role.Id,
+                        Name = r.Role.Name,
+                        Description = r.Role.Description,
+                        IsSystemRole = r.Role.IsSystemRole
+                    })
+                    .ToArray(),
+
                 Subordinates = x.Subordinates
+                    .Where(s => s.IsActive)
                     .OrderBy(s => s.DisplayName)
                     .Select(s => new UserListItemDto
                     {
@@ -100,17 +112,18 @@ public class UserService(ApplicationDbContext db)
                     .ToArray()
             })
             .FirstOrDefaultAsync(cancellationToken);
-
-        return user;
     }
 
-    public async Task<IReadOnlyCollection<UserListItemDto>> GetSubordinatesAsync(
-        int managerId,
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<UserListItemDto>>
+        GetSubordinatesAsync(
+            int managerId,
+            CancellationToken cancellationToken = default)
     {
         return await db.Users
             .AsNoTracking()
-            .Where(x => x.ManagerId == managerId)
+            .Where(x =>
+                x.ManagerId == managerId &&
+                x.IsActive)
             .OrderBy(x => x.DisplayName)
             .Select(x => new UserListItemDto
             {
@@ -193,7 +206,9 @@ public class UserService(ApplicationDbContext db)
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return (await GetByIdAsync(user.Id, cancellationToken))!;
+        return (await GetByIdAsync(
+            user.Id,
+            cancellationToken))!;
     }
 
     public async Task<UserDetailsDto?> UpdateAsync(
@@ -237,7 +252,9 @@ public class UserService(ApplicationDbContext db)
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return await GetByIdAsync(id, cancellationToken);
+        return await GetByIdAsync(
+            id,
+            cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(
@@ -254,9 +271,6 @@ public class UserService(ApplicationDbContext db)
             return false;
         }
 
-        // Не удаляем физически.
-        // Пользователь может участвовать в задачах,
-        // комментариях и истории.
         user.IsActive = false;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -275,8 +289,9 @@ public class UserService(ApplicationDbContext db)
         {
             var departmentExists = await db.Departments
                 .AnyAsync(
-                    x => x.Id == departmentId.Value &&
-                         x.IsActive,
+                    x =>
+                        x.Id == departmentId.Value &&
+                        x.IsActive,
                     cancellationToken);
 
             if (!departmentExists)
@@ -290,8 +305,9 @@ public class UserService(ApplicationDbContext db)
         {
             var positionExists = await db.Positions
                 .AnyAsync(
-                    x => x.Id == positionId.Value &&
-                         x.IsActive,
+                    x =>
+                        x.Id == positionId.Value &&
+                        x.IsActive,
                     cancellationToken);
 
             if (!positionExists)
@@ -315,8 +331,9 @@ public class UserService(ApplicationDbContext db)
 
         var managerExists = await db.Users
             .AnyAsync(
-                x => x.Id == managerId.Value &&
-                     x.IsActive,
+                x =>
+                    x.Id == managerId.Value &&
+                    x.IsActive,
                 cancellationToken);
 
         if (!managerExists)
@@ -335,7 +352,8 @@ public class UserService(ApplicationDbContext db)
             if (createsCycle)
             {
                 throw new InvalidOperationException(
-                    "Нельзя назначить руководителя: это создаст цикл в иерархии.");
+                    "Нельзя назначить руководителя: " +
+                    "это создаст цикл в иерархии.");
             }
         }
     }
@@ -373,52 +391,6 @@ public class UserService(ApplicationDbContext db)
 
             currentId = parentId.Value;
         }
-    }
-
-    private static UserDetailsDto MapDetails(User user)
-    {
-        return new UserDetailsDto
-        {
-            Id = user.Id,
-            Login = user.Login,
-            DisplayName = user.DisplayName,
-            Email = user.Email,
-            Phone = user.Phone,
-
-            DepartmentId = user.DepartmentId,
-            DepartmentName = user.Department?.Name,
-
-            PositionId = user.PositionId,
-            PositionName = user.Position?.Name,
-
-            ManagerId = user.ManagerId,
-            ManagerName = user.Manager?.DisplayName,
-
-            IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt,
-            LastLoginAt = user.LastLoginAt,
-
-            Subordinates = user.Subordinates
-                .OrderBy(x => x.DisplayName)
-                .Select(x => new UserListItemDto
-                {
-                    Id = x.Id,
-                    Login = x.Login,
-                    DisplayName = x.DisplayName,
-                    Email = x.Email,
-                    IsActive = x.IsActive,
-
-                    DepartmentId = x.DepartmentId,
-                    DepartmentName = user.Department?.Name,
-
-                    PositionId = x.PositionId,
-                    PositionName = user.Position?.Name,
-
-                    ManagerId = x.ManagerId,
-                    ManagerName = user.DisplayName
-                })
-                .ToArray()
-        };
     }
 
     private static string? Normalize(string? value)

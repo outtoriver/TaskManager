@@ -6,6 +6,7 @@ using TaskManager.Server.Features.Positions.Services;
 using TaskManager.Server.Authorization;
 using TaskManager.Server.Features.Roles.Services;
 
+
 namespace TaskManager.Server;
 
 public class Program
@@ -36,6 +37,7 @@ public class Program
         builder.Services.AddScoped<IPositionService, PositionService>();
         builder.Services.AddPermissionAuthorization();
         builder.Services.AddScoped<IRoleService, RoleService>();
+        builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 
         // ============================================
         // Application
