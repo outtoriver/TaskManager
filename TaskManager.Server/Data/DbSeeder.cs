@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TaskManager.Server.Models;
+using TaskManager.Server.Models.Roles;
 
 namespace TaskManager.Server.Data;
 

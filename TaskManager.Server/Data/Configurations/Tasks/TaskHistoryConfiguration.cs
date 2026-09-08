@@ -25,7 +25,7 @@ public class TaskHistoryConfiguration
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(x => x.ChangedBy)
-            .WithMany()
+            .WithMany(x => x.TaskHistoryEntries)
             .HasForeignKey(x => x.ChangedById)
             .OnDelete(DeleteBehavior.Restrict);
     }

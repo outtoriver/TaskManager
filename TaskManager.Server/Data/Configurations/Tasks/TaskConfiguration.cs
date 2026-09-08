@@ -8,7 +8,12 @@ public class TaskConfiguration : IEntityTypeConfiguration<TaskItem>
 {
     public void Configure(EntityTypeBuilder<TaskItem> builder)
     {
-        builder.ToTable("Tasks");
+        builder.ToTable("Tasks", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Tasks_Progress",
+                "[Progress] >= 0 AND [Progress] <= 100");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -48,8 +53,15 @@ public class TaskConfiguration : IEntityTypeConfiguration<TaskItem>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => x.AssignedToId);
+
+        builder.HasIndex(x => x.CreatedById);
+
         builder.HasIndex(x => x.Status);
+
+        builder.HasIndex(x => x.Priority);
+
         builder.HasIndex(x => x.DueDate);
+
         builder.HasIndex(x => x.IsImportant);
     }
 }

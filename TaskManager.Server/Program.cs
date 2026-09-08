@@ -5,7 +5,7 @@ namespace TaskManager.Server;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -16,10 +16,15 @@ public class Program
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseSqlServer(
-                builder.Configuration.GetConnectionString("DefaultConnection"));
+                builder.Configuration.GetConnectionString(
+                    "DefaultConnection"));
         });
 
         var app = builder.Build();
+
+        app.UseDefaultFiles();
+
+        app.MapStaticAssets();
 
         if (app.Environment.IsDevelopment())
         {
@@ -33,14 +38,6 @@ public class Program
         app.MapControllers();
 
         app.MapFallbackToFile("/index.html");
-
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider
-                .GetRequiredService<ApplicationDbContext>();
-
-            await DbSeeder.SeedAsync(db);
-        }
 
         app.Run();
     }

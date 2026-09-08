@@ -26,7 +26,7 @@ public class TaskCommentConfiguration
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(x => x.Author)
-            .WithMany()
+            .WithMany(x => x.TaskComments)
             .HasForeignKey(x => x.AuthorId)
             .OnDelete(DeleteBehavior.Restrict);
     }

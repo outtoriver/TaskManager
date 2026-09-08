@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Server.Enums.Users;
+﻿namespace TaskManager.Server.Enums.Tasks;
 
 public enum TaskPriority
 {

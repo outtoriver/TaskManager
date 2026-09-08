@@ -1,5 +1,7 @@
-﻿using TaskManager.Server.Enums.Users;
+﻿using TaskManager.Server.Enums.Tasks;
 using TaskManager.Server.Models.Users;
+
+using TaskStatusEnum = TaskManager.Server.Enums.Tasks.TaskStatus;
 
 namespace TaskManager.Server.Models.Tasks;
 
@@ -11,7 +13,7 @@ public class TaskItem
 
     public string? Description { get; set; }
 
-    public TaskStatus Status { get; set; } = TaskStatus.New;
+    public TaskStatusEnum Status { get; set; } = TaskStatusEnum.New;
 
     public TaskPriority Priority { get; set; } = TaskPriority.Normal;
 
