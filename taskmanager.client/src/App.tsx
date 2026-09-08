@@ -1,14 +1,29 @@
 import './App.css';
+import { useEffect, useState } from 'react';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { AdministrationPage } from './pages/AdministrationPage';
+
+function RouterView() {
+  const [hash, setHash] = useState(window.location.hash || '#dashboard');
+  useEffect(() => {
+    const handler = () => setHash(window.location.hash || '#dashboard');
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+
+  return hash === '#admin' || hash === '#users'
+    ? <AdministrationPage />
+    : <DashboardPage />;
+}
 
 function App() {
   return (
     <AuthProvider>
       <ProtectedRoute fallback={<LoginPage />}>
-        <DashboardPage />
+        <RouterView />
       </ProtectedRoute>
     </AuthProvider>
   );

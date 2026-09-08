@@ -44,8 +44,7 @@ public class Program
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseSqlServer(
-                builder.Configuration.GetConnectionString(
-                    "DefaultConnection"));
+                builder.Configuration.GetConnectionString("DefaultConnection"));
         });
 
         // ============================================================
@@ -63,24 +62,13 @@ public class Program
         // ============================================================
 
         builder.Services
-            .AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
-
-                options.DefaultSignInScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
-
-                options.DefaultChallengeScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
-            })
+            .AddAuthentication()
             .AddCookie(
                 AuthenticationConstants.ApplicationCookieScheme,
                 options =>
                 {
                     options.Cookie.Name =
                         AuthenticationConstants.ApplicationCookieName;
-
                     options.LoginPath = "/api/auth/login";
                     options.AccessDeniedPath = "/api/auth/forbidden";
                     options.SlidingExpiration = true;
@@ -88,32 +76,6 @@ public class Program
                     options.Cookie.HttpOnly = true;
                     options.Cookie.SameSite = SameSiteMode.Lax;
                     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-
-                    options.Events.OnRedirectToLogin = context =>
-                    {
-                        if (context.Request.Path.StartsWithSegments("/api"))
-                        {
-                            context.Response.StatusCode =
-                                StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        }
-
-                        context.Response.Redirect(context.RedirectUri);
-                        return Task.CompletedTask;
-                    };
-
-                    options.Events.OnRedirectToAccessDenied = context =>
-                    {
-                        if (context.Request.Path.StartsWithSegments("/api"))
-                        {
-                            context.Response.StatusCode =
-                                StatusCodes.Status403Forbidden;
-                            return Task.CompletedTask;
-                        }
-
-                        context.Response.Redirect(context.RedirectUri);
-                        return Task.CompletedTask;
-                    };
                 })
             .AddNegotiate(
                 AuthenticationConstants.WindowsScheme,
@@ -189,19 +151,26 @@ public class Program
         // HTTP pipeline
         // ============================================================
 
-        app.UseDefaultFiles();
-        app.MapStaticAssets();
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHttpsRedirection();
+            app.UseDefaultFiles();
+            app.MapStaticAssets();
+        }
 
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
         }
 
-        app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
-        app.MapFallbackToFile("/index.html");
+
+        if (!app.Environment.IsDevelopment())
+        {
+            app.MapFallbackToFile("index.html");
+        }
 
         await app.RunAsync();
     }

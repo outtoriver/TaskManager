@@ -127,14 +127,14 @@ export function DashboardPage() {
           {quickActions
             .filter((action) => hasPermission(action.permission))
             .map((action) => (
-              <article className="dashboard-card" key={action.permission}>
+              <a className="dashboard-card dashboard-card-link" key={action.permission} href={action.permission === 'Users.View' ? '#admin' : '#'}>
                 <div className="dashboard-card-icon">{action.icon}</div>
                 <div>
                   <h2>{action.title}</h2>
                   <p>{action.description}</p>
                 </div>
                 <span className="card-permission">{action.permission}</span>
-              </article>
+              </a>
             ))}
         </section>
 
