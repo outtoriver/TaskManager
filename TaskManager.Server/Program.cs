@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Server.Data;
 using TaskManager.Server.Features.Users.Services;
+using TaskManager.Server.Features.Departments.Services;
+using TaskManager.Server.Features.Positions.Services;
 
 namespace TaskManager.Server;
 
@@ -28,6 +30,8 @@ public class Program
 
         // Application services
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+        builder.Services.AddScoped<IPositionService, PositionService>();
 
         // ============================================
         // Application
