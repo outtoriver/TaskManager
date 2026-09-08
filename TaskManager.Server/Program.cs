@@ -62,20 +62,66 @@ public class Program
         // ============================================================
 
         builder.Services
-            .AddAuthentication()
+            .AddAuthentication(options =>
+            {
+                // IMPORTANT:
+                // The normal application authentication is the cookie.
+                // Windows authentication is selected explicitly by
+                // /api/auth/windows via AuthenticationSchemes = Negotiate.
+                options.DefaultAuthenticateScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+
+                options.DefaultSignInScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+
+                options.DefaultChallengeScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+            })
             .AddCookie(
                 AuthenticationConstants.ApplicationCookieScheme,
                 options =>
                 {
                     options.Cookie.Name =
                         AuthenticationConstants.ApplicationCookieName;
+
                     options.LoginPath = "/api/auth/login";
                     options.AccessDeniedPath = "/api/auth/forbidden";
+
                     options.SlidingExpiration = true;
                     options.ExpireTimeSpan = TimeSpan.FromHours(8);
+
                     options.Cookie.HttpOnly = true;
                     options.Cookie.SameSite = SameSiteMode.Lax;
-                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SecurePolicy =
+                        CookieSecurePolicy.Always;
+
+                    // Never return HTML redirects for API authorization
+                    // failures. React receives a normal 401/403 instead.
+                    options.Events.OnRedirectToLogin = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api"))
+                        {
+                            context.Response.StatusCode =
+                                StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        }
+
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    };
+
+                    options.Events.OnRedirectToAccessDenied = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api"))
+                        {
+                            context.Response.StatusCode =
+                                StatusCodes.Status403Forbidden;
+                            return Task.CompletedTask;
+                        }
+
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    };
                 })
             .AddNegotiate(
                 AuthenticationConstants.WindowsScheme,
@@ -151,6 +197,9 @@ public class Program
         // HTTP pipeline
         // ============================================================
 
+        // In Development the Vite dev server owns the frontend/static
+        // files, so ASP.NET must not try to resolve a local wwwroot or
+        // redirect the HTTP dev endpoint to an unspecified HTTPS port.
         if (!app.Environment.IsDevelopment())
         {
             app.UseHttpsRedirection();
@@ -165,6 +214,7 @@ public class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
+
         app.MapControllers();
 
         if (!app.Environment.IsDevelopment())
