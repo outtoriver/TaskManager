@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Server.Services.CurrentUser;
+namespace TaskManager.Server.Services.CurrentUser;
 
 public interface ICurrentUserService
 {

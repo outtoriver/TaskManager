@@ -1,5 +1,6 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using TaskManager.Server.Common.Constants;
 using TaskManager.Server.Data;
 
 namespace TaskManager.Server.Services.CurrentUser;
@@ -18,11 +19,20 @@ public sealed class CurrentUserService(
     {
         get
         {
-            var claim = _httpContextAccessor.HttpContext?
-                .User
-                .FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = _httpContextAccessor.HttpContext?.User;
 
-            return int.TryParse(claim, out var id)
+            var claim = user?.FindFirstValue(
+                AuthenticationConstants.UserIdClaim);
+
+            if (int.TryParse(claim, out var id))
+            {
+                return id;
+            }
+
+            claim = user?.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            return int.TryParse(claim, out id)
                 ? id
                 : null;
         }
@@ -43,21 +53,14 @@ public sealed class CurrentUserService(
         string permission,
         CancellationToken cancellationToken = default)
     {
-        if (!IsAuthenticated)
-        {
-            return false;
-        }
-
-        var userId = UserId;
-
-        if (!userId.HasValue)
+        if (!IsAuthenticated || !UserId.HasValue)
         {
             return false;
         }
 
         return await _db.UserRoles
             .AsNoTracking()
-            .Where(x => x.UserId == userId.Value)
+            .Where(x => x.UserId == UserId.Value)
             .SelectMany(x => x.Role.RolePermissions)
             .AnyAsync(
                 x => x.Permission.Code == permission,
@@ -68,14 +71,7 @@ public sealed class CurrentUserService(
         string role,
         CancellationToken cancellationToken = default)
     {
-        if (!IsAuthenticated)
-        {
-            return false;
-        }
-
-        var userId = UserId;
-
-        if (!userId.HasValue)
+        if (!IsAuthenticated || !UserId.HasValue)
         {
             return false;
         }
@@ -83,7 +79,7 @@ public sealed class CurrentUserService(
         return await _db.UserRoles
             .AsNoTracking()
             .AnyAsync(
-                x => x.UserId == userId.Value &&
+                x => x.UserId == UserId.Value &&
                      x.Role.Name == role,
                 cancellationToken);
     }
