@@ -8,6 +8,7 @@ public interface ILocalAccountService
         string login,
         string displayName,
         string password,
+        string roleName,
         CancellationToken cancellationToken = default);
 
     Task<bool> SetPasswordAsync(

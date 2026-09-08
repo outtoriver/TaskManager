@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using TaskManager.Server.Common.Constants;
 using TaskManager.Server.Data;
 using TaskManager.Server.Enums.Users;
 using TaskManager.Server.Models.Roles;
@@ -16,12 +17,24 @@ public sealed class LocalAccountService(
         string login,
         string displayName,
         string password,
+        string roleName,
         CancellationToken cancellationToken = default)
     {
         login = login.Trim();
         displayName = displayName.Trim();
+        roleName = roleName.Trim();
 
-        ValidateCredentials(login, displayName, password);
+        ValidateCredentials(
+            login,
+            displayName,
+            password);
+
+        if (string.IsNullOrWhiteSpace(roleName))
+        {
+            throw new ArgumentException(
+                "Роль пользователя не может быть пустой.",
+                nameof(roleName));
+        }
 
         var exists = await db.Users
             .AnyAsync(
@@ -34,15 +47,15 @@ public sealed class LocalAccountService(
                 $"Пользователь '{login}' уже существует.");
         }
 
-        var adminRole = await db.Roles
+        var role = await db.Roles
             .FirstOrDefaultAsync(
-                x => x.Name == "Administrator",
+                x => x.Name == roleName,
                 cancellationToken);
 
-        if (adminRole is null)
+        if (role is null)
         {
             throw new InvalidOperationException(
-                "Роль Administrator отсутствует в базе данных.");
+                $"Роль '{roleName}' отсутствует в базе данных.");
         }
 
         var user = new User
@@ -58,12 +71,13 @@ public sealed class LocalAccountService(
             user,
             password);
 
-        user.UserRoles.Add(new UserRole
-        {
-            User = user,
-            Role = adminRole,
-            RoleId = adminRole.Id
-        });
+        user.UserRoles.Add(
+            new UserRole
+            {
+                User = user,
+                Role = role,
+                RoleId = role.Id
+            });
 
         db.Users.Add(user);
 
@@ -84,6 +98,13 @@ public sealed class LocalAccountService(
                 nameof(password));
         }
 
+        if (password.Length < 8)
+        {
+            throw new ArgumentException(
+                "Пароль должен содержать минимум 8 символов.",
+                nameof(password));
+        }
+
         var user = await db.Users
             .FirstOrDefaultAsync(
                 x => x.Id == userId,
@@ -94,9 +115,10 @@ public sealed class LocalAccountService(
             return false;
         }
 
-        user.PasswordHash = passwordHasher.HashPassword(
-            user,
-            password);
+        user.PasswordHash =
+            passwordHasher.HashPassword(
+                user,
+                password);
 
         await db.SaveChangesAsync(cancellationToken);
 

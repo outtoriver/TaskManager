@@ -1,9 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TaskManager.Server.Authentication.Models;
+using TaskManager.Server.Common.Constants;
 using TaskManager.Server.Data;
-using TaskManager.Server.Models.Roles;
-using TaskManager.Server.Models.Users;
 
 namespace TaskManager.Server.Authentication.Services;
 
@@ -22,7 +21,8 @@ public sealed class AuthenticationBootstrapService(
             return;
         }
 
-        var login = authenticationOptions.BootstrapAdmin.Login.Trim();
+        var login =
+            authenticationOptions.BootstrapAdmin.Login.Trim();
 
         var exists = await db.Users
             .AnyAsync(
@@ -38,6 +38,7 @@ public sealed class AuthenticationBootstrapService(
             authenticationOptions.BootstrapAdmin.Login,
             authenticationOptions.BootstrapAdmin.DisplayName,
             authenticationOptions.BootstrapAdmin.Password,
+            RoleNames.Administrator,
             cancellationToken);
     }
 }
