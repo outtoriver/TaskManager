@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using TaskManager.Server.Authentication.Models;
 using TaskManager.Server.Authentication.Services;
 using TaskManager.Server.Authorization;
 using TaskManager.Server.Common.Constants;
@@ -26,8 +27,15 @@ public class Program
         // ============================================================
 
         builder.Services.AddControllers();
-
         builder.Services.AddOpenApi();
+
+        // ============================================================
+        // Authentication options
+        // ============================================================
+
+        builder.Services.Configure<AuthenticationOptions>(
+            builder.Configuration.GetSection(
+                AuthenticationOptions.SectionName));
 
         // ============================================================
         // Database
@@ -41,8 +49,10 @@ public class Program
         });
 
         // ============================================================
-        // Password hashing
+        // HTTP context / password hashing
         // ============================================================
+
+        builder.Services.AddHttpContextAccessor();
 
         builder.Services.AddScoped<
             IPasswordHasher<User>,
@@ -53,38 +63,61 @@ public class Program
         // ============================================================
 
         builder.Services
-            .AddAuthentication()
+            .AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+
+                options.DefaultSignInScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+
+                options.DefaultChallengeScheme =
+                    AuthenticationConstants.ApplicationCookieScheme;
+            })
             .AddCookie(
-                AuthenticationConstants.CookieScheme,
+                AuthenticationConstants.ApplicationCookieScheme,
                 options =>
                 {
                     options.Cookie.Name =
-                        AuthenticationConstants.CookieName;
+                        AuthenticationConstants.ApplicationCookieName;
 
-                    options.LoginPath =
-                        "/api/auth/login";
-
-                    options.AccessDeniedPath =
-                        "/api/auth/forbidden";
-
+                    options.LoginPath = "/api/auth/login";
+                    options.AccessDeniedPath = "/api/auth/forbidden";
                     options.SlidingExpiration = true;
-
-                    options.ExpireTimeSpan =
-                        TimeSpan.FromHours(8);
-
+                    options.ExpireTimeSpan = TimeSpan.FromHours(8);
                     options.Cookie.HttpOnly = true;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 
-                    options.Cookie.SameSite =
-                        SameSiteMode.Lax;
+                    options.Events.OnRedirectToLogin = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api"))
+                        {
+                            context.Response.StatusCode =
+                                StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        }
 
-                    options.Cookie.SecurePolicy =
-                        CookieSecurePolicy.Always;
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    };
+
+                    options.Events.OnRedirectToAccessDenied = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments("/api"))
+                        {
+                            context.Response.StatusCode =
+                                StatusCodes.Status403Forbidden;
+                            return Task.CompletedTask;
+                        }
+
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    };
                 })
             .AddNegotiate(
                 AuthenticationConstants.WindowsScheme,
-                options =>
-                {
-                });
+                _ => { });
 
         // ============================================================
         // Authorization
@@ -93,28 +126,22 @@ public class Program
         builder.Services.AddPermissionAuthorization();
 
         // ============================================================
-        // Application services
+        // Current user
         // ============================================================
 
         builder.Services.AddScoped<
-            IUserService,
-            UserService>();
+            ICurrentUserService,
+            CurrentUserService>();
 
-        builder.Services.AddScoped<
-            IDepartmentService,
-            DepartmentService>();
+        // ============================================================
+        // Application services
+        // ============================================================
 
-        builder.Services.AddScoped<
-            IPositionService,
-            PositionService>();
-
-        builder.Services.AddScoped<
-            IRoleService,
-            RoleService>();
-
-        builder.Services.AddScoped<
-            IUserRoleService,
-            UserRoleService>();
+        builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+        builder.Services.AddScoped<IPositionService, PositionService>();
+        builder.Services.AddScoped<IRoleService, RoleService>();
+        builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 
         // ============================================================
         // Authentication services
@@ -132,8 +159,7 @@ public class Program
             ILocalAccountService,
             LocalAccountService>();
 
-        builder.Services.AddScoped<
-            AuthenticationBootstrapService>();
+        builder.Services.AddScoped<AuthenticationBootstrapService>();
 
         // ============================================================
         // Application
@@ -141,8 +167,29 @@ public class Program
 
         var app = builder.Build();
 
-        app.UseDefaultFiles();
+        // ============================================================
+        // Database initialization
+        // ============================================================
 
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider
+                .GetRequiredService<ApplicationDbContext>();
+
+            await db.Database.MigrateAsync();
+            await DbSeeder.SeedAsync(db);
+
+            var bootstrap = scope.ServiceProvider
+                .GetRequiredService<AuthenticationBootstrapService>();
+
+            await bootstrap.ExecuteAsync();
+        }
+
+        // ============================================================
+        // HTTP pipeline
+        // ============================================================
+
+        app.UseDefaultFiles();
         app.MapStaticAssets();
 
         if (app.Environment.IsDevelopment())
@@ -151,30 +198,11 @@ public class Program
         }
 
         app.UseHttpsRedirection();
-
         app.UseAuthentication();
-
         app.UseAuthorization();
-
         app.MapControllers();
-
         app.MapFallbackToFile("/index.html");
 
-        // ============================================================
-        // Database seed
-        //
-        // Временно запускаем seed один раз.
-        // После проверки уберём вызов из startup.
-        // ============================================================
-
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider
-                .GetRequiredService<ApplicationDbContext>();
-
-            await DbSeeder.SeedAsync(db);
-        }
-
-        app.Run();
+        await app.RunAsync();
     }
 }
