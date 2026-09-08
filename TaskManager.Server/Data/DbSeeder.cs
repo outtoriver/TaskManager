@@ -1,42 +1,44 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using TaskManager.Server.Models;
+using TaskManager.Server.Common.Constants;
+using TaskManager.Server.Data;
 using TaskManager.Server.Models.Roles;
 
 namespace TaskManager.Server.Data;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(ApplicationDbContext db)
+    public static async Task SeedAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken = default)
     {
-        await db.Database.MigrateAsync();
-
-        await SeedRolesAsync(db);
-        await SeedPermissionsAsync(db);
-        await SeedRolePermissionsAsync(db);
+        await SeedRolesAsync(db, cancellationToken);
+        await SeedPermissionsAsync(db, cancellationToken);
+        await SeedRolePermissionsAsync(db, cancellationToken);
     }
 
-    private static async Task SeedRolesAsync(ApplicationDbContext db)
+    private static async Task SeedRolesAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
     {
         var roles = new[]
         {
             new Role
             {
-                Id = 1,
-                Name = "Administrator",
+                Name = RoleNames.Administrator,
                 Description = "Полный доступ к системе",
                 IsSystemRole = true
             },
+
             new Role
             {
-                Id = 2,
-                Name = "Manager",
-                Description = "Руководитель",
+                Name = RoleNames.Manager,
+                Description = "Руководитель подразделения",
                 IsSystemRole = true
             },
+
             new Role
             {
-                Id = 3,
-                Name = "User",
+                Name = RoleNames.User,
                 Description = "Обычный сотрудник",
                 IsSystemRole = true
             }
@@ -44,217 +46,364 @@ public static class DbSeeder
 
         foreach (var role in roles)
         {
-            if (!await db.Roles.AnyAsync(x => x.Id == role.Id))
+            var exists = await db.Roles
+                .AnyAsync(
+                    x => x.Name == role.Name,
+                    cancellationToken);
+
+            if (!exists)
             {
                 db.Roles.Add(role);
             }
         }
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task SeedPermissionsAsync(ApplicationDbContext db)
+    private static async Task SeedPermissionsAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
     {
         var permissions = new[]
         {
+            // Users
             new Permission
             {
-                Id = 1,
-                Code = "Users.View",
-                Name = "Просмотр пользователей"
-            },
-            new Permission
-            {
-                Id = 2,
-                Code = "Users.Create",
-                Name = "Создание пользователей"
-            },
-            new Permission
-            {
-                Id = 3,
-                Code = "Users.Edit",
-                Name = "Редактирование пользователей"
-            },
-            new Permission
-            {
-                Id = 4,
-                Code = "Users.Delete",
-                Name = "Удаление пользователей"
+                Code = PermissionCodes.UsersView,
+                Name = "Просмотр пользователей",
+                Description = "Просмотр списка и данных пользователей"
             },
 
             new Permission
             {
-                Id = 5,
-                Code = "Departments.View",
-                Name = "Просмотр отделов"
-            },
-            new Permission
-            {
-                Id = 6,
-                Code = "Departments.Manage",
-                Name = "Управление отделами"
+                Code = PermissionCodes.UsersCreate,
+                Name = "Создание пользователей",
+                Description = "Создание новых пользователей"
             },
 
             new Permission
             {
-                Id = 7,
-                Code = "Tasks.ViewOwn",
-                Name = "Просмотр своих задач"
-            },
-            new Permission
-            {
-                Id = 8,
-                Code = "Tasks.ViewDepartment",
-                Name = "Просмотр задач отдела"
-            },
-            new Permission
-            {
-                Id = 9,
-                Code = "Tasks.ViewAll",
-                Name = "Просмотр всех задач"
-            },
-            new Permission
-            {
-                Id = 10,
-                Code = "Tasks.Create",
-                Name = "Создание задач"
-            },
-            new Permission
-            {
-                Id = 11,
-                Code = "Tasks.Assign",
-                Name = "Назначение задач"
-            },
-            new Permission
-            {
-                Id = 12,
-                Code = "Tasks.Edit",
-                Name = "Редактирование задач"
-            },
-            new Permission
-            {
-                Id = 13,
-                Code = "Tasks.Delete",
-                Name = "Удаление задач"
-            },
-            new Permission
-            {
-                Id = 14,
-                Code = "Tasks.Approve",
-                Name = "Проверка и принятие задач"
+                Code = PermissionCodes.UsersEdit,
+                Name = "Редактирование пользователей",
+                Description = "Изменение данных пользователей"
             },
 
             new Permission
             {
-                Id = 15,
-                Code = "Calendar.View",
-                Name = "Просмотр календаря"
+                Code = PermissionCodes.UsersDelete,
+                Name = "Удаление пользователей",
+                Description = "Деактивация пользователей"
             },
+
+            // Departments
             new Permission
             {
-                Id = 16,
-                Code = "Calendar.Manage",
-                Name = "Управление календарём"
+                Code = PermissionCodes.DepartmentsView,
+                Name = "Просмотр отделов",
+                Description = "Просмотр списка отделов"
             },
 
             new Permission
             {
-                Id = 17,
-                Code = "Meetings.View",
-                Name = "Просмотр встреч"
+                Code = PermissionCodes.DepartmentsManage,
+                Name = "Управление отделами",
+                Description = "Создание, изменение и деактивация отделов"
             },
+
+            // Positions
             new Permission
             {
-                Id = 18,
-                Code = "Meetings.Create",
-                Name = "Создание встреч"
-            },
-            new Permission
-            {
-                Id = 19,
-                Code = "Meetings.Edit",
-                Name = "Редактирование встреч"
-            },
-            new Permission
-            {
-                Id = 20,
-                Code = "Meetings.Delete",
-                Name = "Удаление встреч"
+                Code = PermissionCodes.PositionsView,
+                Name = "Просмотр должностей",
+                Description = "Просмотр списка должностей"
             },
 
             new Permission
             {
-                Id = 21,
-                Code = "Settings.Manage",
-                Name = "Управление настройками"
+                Code = PermissionCodes.PositionsManage,
+                Name = "Управление должностями",
+                Description = "Создание, изменение и деактивация должностей"
+            },
+
+            // Roles
+            new Permission
+            {
+                Code = PermissionCodes.RolesView,
+                Name = "Просмотр ролей",
+                Description = "Просмотр ролей и их permissions"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.RolesManage,
+                Name = "Управление ролями",
+                Description = "Управление ролями пользователей"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.PermissionsManage,
+                Name = "Управление permissions",
+                Description = "Изменение permissions ролей"
+            },
+
+            // Tasks
+            new Permission
+            {
+                Code = PermissionCodes.TasksViewOwn,
+                Name = "Просмотр своих задач",
+                Description = "Просмотр назначенных пользователю задач"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksViewDepartment,
+                Name = "Просмотр задач отдела",
+                Description = "Просмотр задач пользователей своего подразделения"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksViewAll,
+                Name = "Просмотр всех задач",
+                Description = "Просмотр всех задач системы"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksCreate,
+                Name = "Создание задач",
+                Description = "Создание новых задач"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksAssign,
+                Name = "Назначение задач",
+                Description = "Назначение задач сотрудникам"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksEdit,
+                Name = "Редактирование задач",
+                Description = "Редактирование задач"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksDelete,
+                Name = "Удаление задач",
+                Description = "Удаление или отмена задач"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.TasksApprove,
+                Name = "Проверка задач",
+                Description = "Проверка и принятие выполненных задач"
+            },
+
+            // Calendar
+            new Permission
+            {
+                Code = PermissionCodes.CalendarView,
+                Name = "Просмотр календаря",
+                Description = "Просмотр календаря"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.CalendarManage,
+                Name = "Управление календарём",
+                Description = "Создание и изменение календарных событий"
+            },
+
+            // Meetings
+            new Permission
+            {
+                Code = PermissionCodes.MeetingsView,
+                Name = "Просмотр встреч",
+                Description = "Просмотр встреч"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.MeetingsCreate,
+                Name = "Создание встреч",
+                Description = "Создание встреч"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.MeetingsEdit,
+                Name = "Редактирование встреч",
+                Description = "Изменение встреч"
+            },
+
+            new Permission
+            {
+                Code = PermissionCodes.MeetingsDelete,
+                Name = "Удаление встреч",
+                Description = "Удаление встреч"
+            },
+
+            // Settings
+            new Permission
+            {
+                Code = PermissionCodes.SettingsManage,
+                Name = "Управление настройками",
+                Description = "Изменение системных настроек"
             }
         };
 
         foreach (var permission in permissions)
         {
-            if (!await db.Permissions.AnyAsync(x => x.Id == permission.Id))
+            var exists = await db.Permissions
+                .AnyAsync(
+                    x => x.Code == permission.Code,
+                    cancellationToken);
+
+            if (!exists)
             {
                 db.Permissions.Add(permission);
             }
         }
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task SeedRolePermissionsAsync(ApplicationDbContext db)
+    private static async Task SeedRolePermissionsAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
     {
-        var allPermissions = await db.Permissions
+        var administrator = await db.Roles
+            .FirstAsync(
+                x => x.Name == RoleNames.Administrator,
+                cancellationToken);
+
+        var manager = await db.Roles
+            .FirstAsync(
+                x => x.Name == RoleNames.Manager,
+                cancellationToken);
+
+        var user = await db.Roles
+            .FirstAsync(
+                x => x.Name == RoleNames.User,
+                cancellationToken);
+
+        var permissions = await db.Permissions
+            .AsNoTracking()
+            .ToDictionaryAsync(
+                x => x.Code,
+                cancellationToken);
+
+        var administratorPermissions = permissions.Values
             .Select(x => x.Id)
-            .ToListAsync();
+            .ToArray();
 
-        var managerPermissions = await db.Permissions
-            .Where(x =>
-                x.Code.StartsWith("Tasks.") ||
-                x.Code.StartsWith("Calendar.") ||
-                x.Code.StartsWith("Meetings."))
-            .Select(x => x.Id)
-            .ToListAsync();
+        var managerPermissionCodes = new[]
+        {
+            PermissionCodes.UsersView,
 
-        managerPermissions.Add(1); // Users.View
-        managerPermissions.Add(5); // Departments.View
+            PermissionCodes.DepartmentsView,
 
-        var userPermissions = await db.Permissions
-            .Where(x =>
-                x.Code == "Tasks.ViewOwn" ||
-                x.Code == "Tasks.Create" ||
-                x.Code == "Tasks.Edit" ||
-                x.Code == "Calendar.View" ||
-                x.Code == "Meetings.View" ||
-                x.Code == "Meetings.Create")
-            .Select(x => x.Id)
-            .ToListAsync();
+            PermissionCodes.PositionsView,
 
-        await AddRolePermissionsAsync(db, 1, allPermissions);
-        await AddRolePermissionsAsync(db, 2, managerPermissions.Distinct().ToList());
-        await AddRolePermissionsAsync(db, 3, userPermissions.Distinct().ToList());
+            PermissionCodes.TasksViewOwn,
+            PermissionCodes.TasksViewDepartment,
+            PermissionCodes.TasksCreate,
+            PermissionCodes.TasksAssign,
+            PermissionCodes.TasksEdit,
+            PermissionCodes.TasksApprove,
+
+            PermissionCodes.CalendarView,
+            PermissionCodes.CalendarManage,
+
+            PermissionCodes.MeetingsView,
+            PermissionCodes.MeetingsCreate,
+            PermissionCodes.MeetingsEdit
+        };
+
+        var managerPermissions = managerPermissionCodes
+            .Select(code => permissions[code].Id)
+            .ToArray();
+
+        var userPermissionCodes = new[]
+        {
+            PermissionCodes.UsersView,
+
+            PermissionCodes.DepartmentsView,
+
+            PermissionCodes.PositionsView,
+
+            PermissionCodes.TasksViewOwn,
+            PermissionCodes.TasksCreate,
+            PermissionCodes.TasksEdit,
+
+            PermissionCodes.CalendarView,
+
+            PermissionCodes.MeetingsView,
+            PermissionCodes.MeetingsCreate
+        };
+
+        var userPermissions = userPermissionCodes
+            .Select(code => permissions[code].Id)
+            .ToArray();
+
+        await AddPermissionsAsync(
+            db,
+            administrator.Id,
+            administratorPermissions,
+            cancellationToken);
+
+        await AddPermissionsAsync(
+            db,
+            manager.Id,
+            managerPermissions,
+            cancellationToken);
+
+        await AddPermissionsAsync(
+            db,
+            user.Id,
+            userPermissions,
+            cancellationToken);
     }
 
-    private static async Task AddRolePermissionsAsync(
+    private static async Task AddPermissionsAsync(
         ApplicationDbContext db,
         int roleId,
-        IEnumerable<int> permissionIds)
+        IEnumerable<int> permissionIds,
+        CancellationToken cancellationToken)
     {
-        foreach (var permissionId in permissionIds)
-        {
-            var exists = await db.RolePermissions.AnyAsync(x =>
-                x.RoleId == roleId &&
-                x.PermissionId == permissionId);
+        var permissionIdSet = permissionIds
+            .Distinct()
+            .ToHashSet();
 
-            if (!exists)
+        var existing = await db.RolePermissions
+            .Where(x =>
+                x.RoleId == roleId &&
+                permissionIdSet.Contains(x.PermissionId))
+            .Select(x => x.PermissionId)
+            .ToListAsync(cancellationToken);
+
+        var existingSet = existing.ToHashSet();
+
+        foreach (var permissionId in permissionIdSet)
+        {
+            if (existingSet.Contains(permissionId))
             {
-                db.RolePermissions.Add(new RolePermission
+                continue;
+            }
+
+            db.RolePermissions.Add(
+                new RolePermission
                 {
                     RoleId = roleId,
                     PermissionId = permissionId
                 });
-            }
         }
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 }
