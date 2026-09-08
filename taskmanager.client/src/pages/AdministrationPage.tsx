@@ -36,6 +36,7 @@ export function AdministrationPage() {
   const [userEditor, setUserEditor] = useState<UserEditorState | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<UserListItem | null>(null);
 
   const canManageUsers = hasPermission(permissions.usersCreate) || hasPermission(permissions.usersEdit) || hasPermission(permissions.usersDelete);
   const canManageDepartments = hasPermission(permissions.departmentsManage);
@@ -118,6 +119,20 @@ export function AdministrationPage() {
     } catch (error) { setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Не удалось сохранить должность.' }); }
   }
 
+  async function resetPassword(target: UserListItem, newPassword: string, convertToLocal: boolean) {
+    try {
+      setBusy(true);
+      await adminApi.resetUserPassword(target.id, newPassword, convertToLocal);
+      setPasswordTarget(null);
+      setNotice({ kind: 'success', text: convertToLocal ? 'Пароль установлен, учётная запись переведена в Local.' : 'Пароль изменён.' });
+      await load();
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Не удалось изменить пароль.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const stats = useMemo(() => ({
     users: users.length,
     activeUsers: users.filter(x => x.isActive).length,
@@ -131,8 +146,8 @@ export function AdministrationPage() {
 
   return (
     <div className="admin-page">
-      <header className="page-header">
-        <div><span className="page-kicker">ADMINISTRATION</span><h1>Структура компании</h1><p>Пользователи, подразделения и должности — в одном рабочем пространстве.</p></div>
+      <header className="page-header page-header-with-back">
+        <div className="admin-heading-left"><button className="page-back-button" type="button" onClick={() => window.history.length > 1 ? window.history.back() : (window.location.hash = '#dashboard')}>← Назад</button><div><span className="page-kicker">ADMINISTRATION</span><h1>Структура компании</h1><p>Пользователи, подразделения и должности — в одном рабочем пространстве.</p></div></div>
         <button className="ghost-button" type="button" onClick={() => void load()} disabled={busy}>↻ Обновить</button>
       </header>
 
@@ -150,12 +165,13 @@ export function AdministrationPage() {
         {allowedPositions && <button className={tab === 'positions' ? 'active' : ''} onClick={() => setTab('positions')}>Должности</button>}
       </div>
 
-      {tab === 'users' && allowedUsers && <UsersTab users={users} departments={departments} positions={positions} roles={roles} canCreate={hasPermission(permissions.usersCreate)} canEdit={hasPermission(permissions.usersEdit)} canDelete={hasPermission(permissions.usersDelete)} onCreate={() => setUserEditor(emptyUser)} onOpen={openUser} onEdit={(u) => setUserEditor({ ...emptyUser, ...u, id: u.id, login: u.login, displayName: u.displayName, email: u.email ?? '', phone: '', departmentId: u.departmentId ?? 0, positionId: u.positionId ?? 0, managerId: u.managerId ?? 0, isActive: u.isActive })} onDelete={removeUser} />}
+      {tab === 'users' && allowedUsers && <UsersTab users={users} departments={departments} positions={positions} roles={roles} canCreate={hasPermission(permissions.usersCreate)} canEdit={hasPermission(permissions.usersEdit)} canDelete={hasPermission(permissions.usersDelete)} onCreate={() => setUserEditor(emptyUser)} onOpen={openUser} onEdit={(u) => setUserEditor({ ...emptyUser, ...u, id: u.id, login: u.login, displayName: u.displayName, email: u.email ?? '', phone: '', departmentId: u.departmentId ?? 0, positionId: u.positionId ?? 0, managerId: u.managerId ?? 0, isActive: u.isActive })} onDelete={removeUser} onPassword={setPasswordTarget} />}
       {tab === 'departments' && allowedDepartments && <SimpleDepartmentTab departments={departments} canManage={canManageDepartments} onCreate={() => setSelectedDepartment({ id: 0, name: '', description: '', isActive: true, userCount: 0 })} onEdit={setSelectedDepartment} onDelete={async d => { if (!window.confirm(`Деактивировать отдел «${d.name}»?`)) return; await adminApi.deleteDepartment(d.id); setNotice({ kind: 'success', text: 'Отдел деактивирован.' }); await load(); }} />}
       {tab === 'positions' && allowedPositions && <SimplePositionTab positions={positions} canManage={canManagePositions} onCreate={() => setSelectedPosition({ id: 0, name: '', isManagerPosition: false, isActive: true, userCount: 0 })} onEdit={setSelectedPosition} onDelete={async p => { if (!window.confirm(`Деактивировать должность «${p.name}»?`)) return; await adminApi.deletePosition(p.id); setNotice({ kind: 'success', text: 'Должность деактивирована.' }); await load(); }} />}
 
       {userEditor && <UserEditor state={userEditor} users={users} departments={departments} positions={positions} onCancel={() => setUserEditor(null)} onSave={saveUser} />}
       {selectedUser && <UserDetailsPanel user={selectedUser} roles={roles} canManageRoles={hasPermission(permissions.rolesManage)} onClose={() => setSelectedUser(null)} onRolesSaved={async () => { setSelectedUser(await adminApi.getUser(selectedUser.id)); }} />}
+      {passwordTarget && <PasswordResetModal user={passwordTarget} onCancel={() => setPasswordTarget(null)} onSave={(password, convertToLocal) => resetPassword(passwordTarget, password, convertToLocal)} />}
       {selectedDepartment && <DepartmentEditor department={selectedDepartment.id ? selectedDepartment : null} onCancel={() => setSelectedDepartment(null)} onSave={saveDepartment} />}
       {selectedPosition && <PositionEditor position={selectedPosition.id ? selectedPosition : null} onCancel={() => setSelectedPosition(null)} onSave={savePosition} />}
     </div>
@@ -165,10 +181,10 @@ export function AdministrationPage() {
 interface UserEditorState { id?: number; login: string; displayName: string; email: string; phone: string; departmentId: number; positionId: number; managerId: number; isActive: boolean; }
 const emptyUser: UserEditorState = { login: '', displayName: '', email: '', phone: '', departmentId: 0, positionId: 0, managerId: 0, isActive: true };
 
-function UsersTab({ users, departments, positions, canCreate, canEdit, canDelete, onCreate, onOpen, onEdit, onDelete }: { users: UserListItem[]; departments: Department[]; positions: Position[]; roles: Role[]; canCreate: boolean; canEdit: boolean; canDelete: boolean; onCreate: () => void; onOpen: (id: number) => void; onEdit: (u: UserListItem) => void; onDelete: (u: UserListItem) => void; }) {
+function UsersTab({ users, departments, positions, canCreate, canEdit, canDelete, onCreate, onOpen, onEdit, onDelete, onPassword }: { users: UserListItem[]; departments: Department[]; positions: Position[]; roles: Role[]; canCreate: boolean; canEdit: boolean; canDelete: boolean; onCreate: () => void; onOpen: (id: number) => void; onEdit: (u: UserListItem) => void; onDelete: (u: UserListItem) => void; onPassword: (u: UserListItem) => void; }) {
   const [query, setQuery] = useState(''); const [departmentId, setDepartmentId] = useState(0); const [activeOnly, setActiveOnly] = useState(true);
   const filtered = users.filter(u => (!activeOnly || u.isActive) && (!departmentId || u.departmentId === departmentId) && `${u.login} ${u.displayName} ${u.email ?? ''}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="data-section"><div className="section-toolbar"><div className="filters"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск сотрудника…" /><select value={departmentId} onChange={e => setDepartmentId(Number(e.target.value))}><option value={0}>Все отделы</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select><label className="check"><input type="checkbox" checked={activeOnly} onChange={e => setActiveOnly(e.target.checked)} /> Только активные</label></div>{canCreate && <button className="primary-button" onClick={onCreate}>＋ Добавить сотрудника</button>}</div><div className="table-card"><table><thead><tr><th>Сотрудник</th><th>Отдел</th><th>Должность</th><th>Руководитель</th><th>Статус</th><th /></tr></thead><tbody>{filtered.map(u => <tr key={u.id} onDoubleClick={() => onOpen(u.id)}><td><button className="row-link" onClick={() => onOpen(u.id)}><span className="avatar">{u.displayName.slice(0,1).toUpperCase()}</span><span><strong>{u.displayName}</strong><small>{u.login}</small></span></button></td><td>{u.departmentName ?? '—'}</td><td>{u.positionName ?? '—'}</td><td>{u.managerName ?? '—'}</td><td><span className={u.isActive ? 'badge success' : 'badge muted'}>{u.isActive ? 'Активен' : 'Неактивен'}</span></td><td className="actions">{canEdit && <button onClick={() => onEdit(u)}>Изменить</button>}{canDelete && u.isActive && <button className="danger-text" onClick={() => onDelete(u)}>Отключить</button>}</td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-state">Сотрудники не найдены.</div>}</div></section>;
+  return <section className="data-section"><div className="section-toolbar"><div className="filters"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск сотрудника…" /><select value={departmentId} onChange={e => setDepartmentId(Number(e.target.value))}><option value={0}>Все отделы</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select><label className="check"><input type="checkbox" checked={activeOnly} onChange={e => setActiveOnly(e.target.checked)} /> Только активные</label></div>{canCreate && <button className="primary-button" onClick={onCreate}>＋ Добавить сотрудника</button>}</div><div className="table-card"><table><thead><tr><th>Сотрудник</th><th>Отдел</th><th>Должность</th><th>Руководитель</th><th>Статус</th><th /></tr></thead><tbody>{filtered.map(u => <tr key={u.id} onDoubleClick={() => onOpen(u.id)}><td><button className="row-link" onClick={() => onOpen(u.id)}><span className="avatar">{u.displayName.slice(0,1).toUpperCase()}</span><span><strong>{u.displayName}</strong><small>{u.login}</small></span></button></td><td>{u.departmentName ?? '—'}</td><td>{u.positionName ?? '—'}</td><td>{u.managerName ?? '—'}</td><td><span className={u.isActive ? 'badge success' : 'badge muted'}>{u.isActive ? 'Активен' : 'Неактивен'}</span></td><td className="actions">{canEdit && <button onClick={() => onEdit(u)}>Изменить</button>}{canEdit && u.isActive && <button onClick={() => onPassword(u)}>Пароль</button>}{canDelete && u.isActive && <button className="danger-text" onClick={() => onDelete(u)}>Отключить</button>}</td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-state">Сотрудники не найдены.</div>}</div></section>;
 }
 
 function SimpleDepartmentTab({ departments, canManage, onCreate, onEdit, onDelete }: { departments: Department[]; canManage: boolean; onCreate: () => void; onEdit: (d: Department) => void; onDelete: (d: Department) => void }) { return <section className="data-section"><div className="section-toolbar"><div><h2>Подразделения</h2><p>Организационные единицы компании.</p></div>{canManage && <button className="primary-button" onClick={onCreate}>＋ Добавить отдел</button>}</div><div className="card-grid">{departments.map(d => <article className="entity-card" key={d.id}><div className="entity-icon">⌁</div><div className="entity-copy"><span className="badge muted">{d.isActive ? 'Активен' : 'Неактивен'}</span><h3>{d.name}</h3><p>{d.description || 'Без описания'}</p><strong>{d.userCount} сотрудников</strong></div>{canManage && <div className="card-actions"><button onClick={() => onEdit(d)}>Изменить</button>{d.isActive && <button className="danger-text" onClick={() => onDelete(d)}>Отключить</button>}</div>}</article>)}</div>{departments.length === 0 && <div className="empty-state">Отделов пока нет.</div>}</section>; }
@@ -182,5 +198,28 @@ function DepartmentEditor({ department, onCancel, onSave }: { department: Depart
 function PositionEditor({ position, onCancel, onSave }: { position: Position | null; onCancel: () => void; onSave: (p:{id?:number;name:string;isManagerPosition:boolean;isActive:boolean})=>Promise<void> }) { const[name,setName]=useState(position?.name??'');const[manager,setManager]=useState(position?.isManagerPosition??false);const[active,setActive]=useState(position?.isActive??true);return <Modal title={position?'Редактирование должности':'Новая должность'} onClose={onCancel}><div className="form-grid"><label className="full">Название<input value={name} onChange={e=>setName(e.target.value)} /></label><label className="check full"><input type="checkbox" checked={manager} onChange={e=>setManager(e.target.checked)} /> Руководящая должность</label><label className="check full"><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)} /> Должность активна</label></div><div className="modal-actions"><button className="ghost-button" onClick={onCancel}>Отмена</button><button className="primary-button" disabled={!name.trim()} onClick={()=>void onSave({id:position?.id,name:name.trim(),isManagerPosition:manager,isActive:active})}>Сохранить</button></div></Modal>; }
 
 function UserDetailsPanel({ user, roles, canManageRoles, onClose, onRolesSaved }: { user: UserDetails; roles: Role[]; canManageRoles: boolean; onClose: () => void; onRolesSaved: () => Promise<void> }) { const [selected,setSelected]=useState(user.roles.map(r=>r.id));const[busy,setBusy]=useState(false);return <div className="drawer-backdrop" onMouseDown={onClose}><aside className="details-drawer" onMouseDown={e=>e.stopPropagation()}><button className="drawer-close" onClick={onClose}>×</button><span className="page-kicker">ПРОФИЛЬ СОТРУДНИКА</span><div className="profile-hero"><div className="profile-avatar">{user.displayName.slice(0,1).toUpperCase()}</div><div><h2>{user.displayName}</h2><p>{user.login}</p></div></div><div className="detail-grid"><div><span>Отдел</span><strong>{user.departmentName??'Не назначен'}</strong></div><div><span>Должность</span><strong>{user.positionName??'Не назначена'}</strong></div><div><span>Руководитель</span><strong>{user.managerName??'Не назначен'}</strong></div><div><span>Email</span><strong>{user.email??'—'}</strong></div></div><section className="drawer-section"><div className="section-heading"><h3>Роли</h3>{canManageRoles&&<button className="primary-button small" disabled={busy} onClick={async()=>{setBusy(true);try{await adminApi.setUserRoles(user.id,selected);await onRolesSaved()}finally{setBusy(false)}}}>Сохранить</button>}</div>{roles.map(r=><label className="role-row" key={r.id}><input disabled={!canManageRoles} type="checkbox" checked={selected.includes(r.id)} onChange={e=>setSelected(s=>e.target.checked?[...s,r.id]:s.filter(x=>x!==r.id))}/><span><strong>{r.name}</strong><small>{r.description??'Без описания'}</small></span></label>)}</section><section className="drawer-section"><div className="section-heading"><h3>Подчинённые</h3><span className="badge muted">{user.subordinates.length}</span></div>{user.subordinates.length?user.subordinates.map(x=><div className="subordinate-row" key={x.id}><div className="avatar">{x.displayName.slice(0,1).toUpperCase()}</div><span><strong>{x.displayName}</strong><small>{x.positionName??'Должность не назначена'}</small></span></div>):<p className="muted-text">Подчинённых нет.</p>}</section></aside></div>; }
+
+function PasswordResetModal({ user, onCancel, onSave }: { user: UserListItem; onCancel: () => void; onSave: (password: string, convertToLocal: boolean) => Promise<void> }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [convertToLocal, setConvertToLocal] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
+    if (password.length < 8) { setError('Пароль должен содержать минимум 8 символов.'); return; }
+    if (password !== confirm) { setError('Пароли не совпадают.'); return; }
+    try { setSaving(true); setError(''); await onSave(password, convertToLocal); } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить пароль.'); } finally { setSaving(false); }
+  };
+  return <Modal title={`Пароль · ${user.displayName}`} onClose={onCancel}>
+    <div className="password-help"><strong>{user.login}</strong><span>Windows-пользователь не использует пароль TaskManager, пока не переведён в Local.</span></div>
+    {error && <div className="notice error">{error}</div>}
+    <div className="form-grid">
+      <label className="full">Новый пароль<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoFocus /></label>
+      <label className="full">Повторите пароль<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} /></label>
+      <label className="check full"><input type="checkbox" checked={convertToLocal} onChange={e=>setConvertToLocal(e.target.checked)} /> Перевести Windows-учётную запись в Local</label>
+    </div>
+    <div className="modal-actions"><button className="ghost-button" onClick={onCancel}>Отмена</button><button className="primary-button" disabled={saving} onClick={()=>void submit()}>{saving?'Сохранение...':'Сохранить пароль'}</button></div>
+  </Modal>;
+}
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modal-header"><div><span className="page-kicker">TASKMANAGER</span><h2>{title}</h2></div><button className="drawer-close" onClick={onClose}>×</button></div>{children}</div></div>; }

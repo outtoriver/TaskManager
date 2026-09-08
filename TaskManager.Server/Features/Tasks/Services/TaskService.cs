@@ -262,6 +262,13 @@ public sealed class TaskService(
         var oldStatus = task.Status;
         var oldProgress = task.Progress;
 
+        var canApprove = await currentUser.HasPermissionAsync(PermissionCodes.TasksApprove, cancellationToken);
+        if (!canApprove && (request.Status == TaskStatusEnum.Completed || request.Status == TaskStatusEnum.Cancelled))
+            throw new UnauthorizedAccessException("Завершить или отменить задачу может только руководитель с правом проверки либо администратор.");
+
+        if (!canApprove && oldStatus == TaskStatusEnum.Completed)
+            throw new UnauthorizedAccessException("Завершённую задачу может изменить только пользователь с правом проверки.");
+
         task.Status = request.Status;
         if (request.Progress.HasValue)
             task.Progress = Math.Clamp(request.Progress.Value, 0, 100);

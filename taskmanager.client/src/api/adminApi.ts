@@ -106,6 +106,7 @@ export const adminApi = {
     isActive: boolean;
   }) => request<UserDetails>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteUser: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
+  resetUserPassword: (id: number, newPassword: string, convertToLocal: boolean) => request<void>(`/api/users/${id}/password`, { method: 'POST', body: JSON.stringify({ newPassword, convertToLocal }) }),
   getUserRoles: (id: number) => request<UserRole[]>(`/api/users/${id}/roles`),
   setUserRoles: (id: number, roleIds: number[]) => request<void>(`/api/users/${id}/roles`, {
     method: 'PUT', body: JSON.stringify({ roleIds }),

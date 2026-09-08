@@ -68,3 +68,13 @@ export async function logout(): Promise<void> {
     throw new Error(await parseError(response));
   }
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const response = await fetch('/api/auth/password', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+}

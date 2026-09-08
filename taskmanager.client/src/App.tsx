@@ -6,7 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AdministrationPage } from './pages/AdministrationPage';
 import { TasksPage } from './pages/TasksPage';
-import { AppPageShell } from './components/AppPageShell';
+import { ProfilePage } from './pages/ProfilePage';
 
 function RouterView() {
   const [hash, setHash] = useState(window.location.hash || '#dashboard');
@@ -17,28 +17,11 @@ function RouterView() {
   }, []);
 
   if (hash === '#tasks') return <TasksPage />;
-  if (hash === '#admin' || hash === '#users') {
-    return (
-      <AppPageShell
-        title="Администрирование"
-        eyebrow="TASKMANAGER / ADMINISTRATION"
-        subtitle="Пользователи, отделы и должности организационной структуры."
-      >
-        <AdministrationPage />
-      </AppPageShell>
-    );
-  }
+  if (hash === '#profile') return <ProfilePage />;
+  if (hash === '#admin' || hash === '#users') return <AdministrationPage />;
   return <DashboardPage />;
 }
 
-function App() {
-  return (
-    <AuthProvider>
-      <ProtectedRoute fallback={<LoginPage />}>
-        <RouterView />
-      </ProtectedRoute>
-    </AuthProvider>
-  );
+export default function App() {
+  return <AuthProvider><ProtectedRoute fallback={<LoginPage />}><RouterView /></ProtectedRoute></AuthProvider>;
 }
-
-export default App;
