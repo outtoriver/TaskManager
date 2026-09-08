@@ -6,10 +6,10 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AdministrationPage } from './pages/AdministrationPage';
 import { TasksPage } from './pages/TasksPage';
+import { AppPageShell } from './components/AppPageShell';
 
 function RouterView() {
   const [hash, setHash] = useState(window.location.hash || '#dashboard');
-
   useEffect(() => {
     const handler = () => setHash(window.location.hash || '#dashboard');
     window.addEventListener('hashchange', handler);
@@ -17,7 +17,17 @@ function RouterView() {
   }, []);
 
   if (hash === '#tasks') return <TasksPage />;
-  if (hash === '#admin' || hash === '#users') return <AdministrationPage />;
+  if (hash === '#admin' || hash === '#users') {
+    return (
+      <AppPageShell
+        title="Администрирование"
+        eyebrow="TASKMANAGER / ADMINISTRATION"
+        subtitle="Пользователи, отделы и должности организационной структуры."
+      >
+        <AdministrationPage />
+      </AppPageShell>
+    );
+  }
   return <DashboardPage />;
 }
 
