@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Server.Data;
+using TaskManager.Server.Features.Users.Services;
 
 namespace TaskManager.Server;
 
@@ -9,10 +10,15 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // ============================================
+        // Services
+        // ============================================
+
         builder.Services.AddControllers();
 
         builder.Services.AddOpenApi();
 
+        // Entity Framework Core + SQL Server
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseSqlServer(
@@ -20,12 +26,20 @@ public class Program
                     "DefaultConnection"));
         });
 
+        // Application services
+        builder.Services.AddScoped<IUserService, UserService>();
+
+        // ============================================
+        // Application
+        // ============================================
+
         var app = builder.Build();
 
+        // React/Vite static files
         app.UseDefaultFiles();
-
         app.MapStaticAssets();
 
+        // OpenAPI
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
@@ -33,10 +47,15 @@ public class Program
 
         app.UseHttpsRedirection();
 
+        // Authentication пока не подключаем.
+        // Добавим Windows + Local authentication следующим этапом.
+
         app.UseAuthorization();
 
+        // API controllers
         app.MapControllers();
 
+        // React fallback
         app.MapFallbackToFile("/index.html");
 
         app.Run();
