@@ -5,18 +5,20 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AdministrationPage } from './pages/AdministrationPage';
+import { TasksPage } from './pages/TasksPage';
 
 function RouterView() {
   const [hash, setHash] = useState(window.location.hash || '#dashboard');
+
   useEffect(() => {
     const handler = () => setHash(window.location.hash || '#dashboard');
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  return hash === '#admin' || hash === '#users'
-    ? <AdministrationPage />
-    : <DashboardPage />;
+  if (hash === '#tasks') return <TasksPage />;
+  if (hash === '#admin' || hash === '#users') return <AdministrationPage />;
+  return <DashboardPage />;
 }
 
 function App() {

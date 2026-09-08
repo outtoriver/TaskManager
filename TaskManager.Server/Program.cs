@@ -10,6 +10,7 @@ using TaskManager.Server.Data;
 using TaskManager.Server.Features.Departments.Services;
 using TaskManager.Server.Features.Positions.Services;
 using TaskManager.Server.Features.Roles.Services;
+using TaskManager.Server.Features.Tasks.Services;
 using TaskManager.Server.Features.Users.Services;
 using TaskManager.Server.Models.Users;
 using TaskManager.Server.Services.CurrentUser;
@@ -22,184 +23,88 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // ============================================================
-        // Controllers / OpenAPI
-        // ============================================================
-
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
 
-        // ============================================================
-        // Authentication options
-        // ============================================================
-
         builder.Services.Configure<AuthenticationOptions>(
-            builder.Configuration.GetSection(
-                AuthenticationOptions.SectionName));
-
-        // ============================================================
-        // Database
-        // ============================================================
+            builder.Configuration.GetSection(AuthenticationOptions.SectionName));
 
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseSqlServer(
-                builder.Configuration.GetConnectionString("DefaultConnection"));
+            options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
         });
 
-        // ============================================================
-        // HTTP context / password hashing
-        // ============================================================
-
         builder.Services.AddHttpContextAccessor();
-
-        builder.Services.AddScoped<
-            IPasswordHasher<User>,
-            PasswordHasher<User>>();
-
-        // ============================================================
-        // Authentication
-        // ============================================================
+        builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
         builder.Services
             .AddAuthentication(options =>
             {
-                // IMPORTANT:
-                // The normal application authentication is the cookie.
-                // Windows authentication is selected explicitly by
-                // /api/auth/windows via AuthenticationSchemes = Negotiate.
-                options.DefaultAuthenticateScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
-
-                options.DefaultSignInScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
-
-                options.DefaultChallengeScheme =
-                    AuthenticationConstants.ApplicationCookieScheme;
+                options.DefaultAuthenticateScheme = AuthenticationConstants.ApplicationCookieScheme;
+                options.DefaultSignInScheme = AuthenticationConstants.ApplicationCookieScheme;
+                options.DefaultChallengeScheme = AuthenticationConstants.ApplicationCookieScheme;
             })
-            .AddCookie(
-                AuthenticationConstants.ApplicationCookieScheme,
-                options =>
+            .AddCookie(AuthenticationConstants.ApplicationCookieScheme, options =>
+            {
+                options.Cookie.Name = AuthenticationConstants.ApplicationCookieName;
+                options.LoginPath = "/api/auth/login";
+                options.AccessDeniedPath = "/api/auth/forbidden";
+                options.SlidingExpiration = true;
+                options.ExpireTimeSpan = TimeSpan.FromHours(8);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+
+                options.Events.OnRedirectToLogin = context =>
                 {
-                    options.Cookie.Name =
-                        AuthenticationConstants.ApplicationCookieName;
-
-                    options.LoginPath = "/api/auth/login";
-                    options.AccessDeniedPath = "/api/auth/forbidden";
-
-                    options.SlidingExpiration = true;
-                    options.ExpireTimeSpan = TimeSpan.FromHours(8);
-
-                    options.Cookie.HttpOnly = true;
-                    options.Cookie.SameSite = SameSiteMode.Lax;
-                    options.Cookie.SecurePolicy =
-                        CookieSecurePolicy.Always;
-
-                    // Never return HTML redirects for API authorization
-                    // failures. React receives a normal 401/403 instead.
-                    options.Events.OnRedirectToLogin = context =>
+                    if (context.Request.Path.StartsWithSegments("/api"))
                     {
-                        if (context.Request.Path.StartsWithSegments("/api"))
-                        {
-                            context.Response.StatusCode =
-                                StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        }
-
-                        context.Response.Redirect(context.RedirectUri);
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         return Task.CompletedTask;
-                    };
-
-                    options.Events.OnRedirectToAccessDenied = context =>
+                    }
+                    context.Response.Redirect(context.RedirectUri);
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRedirectToAccessDenied = context =>
+                {
+                    if (context.Request.Path.StartsWithSegments("/api"))
                     {
-                        if (context.Request.Path.StartsWithSegments("/api"))
-                        {
-                            context.Response.StatusCode =
-                                StatusCodes.Status403Forbidden;
-                            return Task.CompletedTask;
-                        }
-
-                        context.Response.Redirect(context.RedirectUri);
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
                         return Task.CompletedTask;
-                    };
-                })
-            .AddNegotiate(
-                AuthenticationConstants.WindowsScheme,
-                _ => { });
-
-        // ============================================================
-        // Authorization
-        // ============================================================
+                    }
+                    context.Response.Redirect(context.RedirectUri);
+                    return Task.CompletedTask;
+                };
+            })
+            .AddNegotiate(AuthenticationConstants.WindowsScheme, _ => { });
 
         builder.Services.AddPermissionAuthorization();
-
-        // ============================================================
-        // Current user
-        // ============================================================
-
-        builder.Services.AddScoped<
-            ICurrentUserService,
-            CurrentUserService>();
-
-        // ============================================================
-        // Application services
-        // ============================================================
+        builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IDepartmentService, DepartmentService>();
         builder.Services.AddScoped<IPositionService, PositionService>();
         builder.Services.AddScoped<IRoleService, RoleService>();
         builder.Services.AddScoped<IUserRoleService, UserRoleService>();
+        builder.Services.AddScoped<ITaskService, TaskService>();
 
-        // ============================================================
-        // Authentication services
-        // ============================================================
-
-        builder.Services.AddScoped<
-            IAppAuthenticationService,
-            LocalAuthenticationService>();
-
-        builder.Services.AddScoped<
-            IWindowsAuthenticationService,
-            WindowsAuthenticationService>();
-
-        builder.Services.AddScoped<
-            ILocalAccountService,
-            LocalAccountService>();
-
+        builder.Services.AddScoped<IAppAuthenticationService, LocalAuthenticationService>();
+        builder.Services.AddScoped<IWindowsAuthenticationService, WindowsAuthenticationService>();
+        builder.Services.AddScoped<ILocalAccountService, LocalAccountService>();
         builder.Services.AddScoped<AuthenticationBootstrapService>();
-
-        // ============================================================
-        // Application
-        // ============================================================
 
         var app = builder.Build();
 
-        // ============================================================
-        // Database initialization
-        // ============================================================
-
         using (var scope = app.Services.CreateScope())
         {
-            var db = scope.ServiceProvider
-                .GetRequiredService<ApplicationDbContext>();
-
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await db.Database.MigrateAsync();
             await DbSeeder.SeedAsync(db);
 
-            var bootstrap = scope.ServiceProvider
-                .GetRequiredService<AuthenticationBootstrapService>();
-
+            var bootstrap = scope.ServiceProvider.GetRequiredService<AuthenticationBootstrapService>();
             await bootstrap.ExecuteAsync();
         }
 
-        // ============================================================
-        // HTTP pipeline
-        // ============================================================
-
-        // In Development the Vite dev server owns the frontend/static
-        // files, so ASP.NET must not try to resolve a local wwwroot or
-        // redirect the HTTP dev endpoint to an unspecified HTTPS port.
         if (!app.Environment.IsDevelopment())
         {
             app.UseHttpsRedirection();
@@ -208,19 +113,14 @@ public class Program
         }
 
         if (app.Environment.IsDevelopment())
-        {
             app.MapOpenApi();
-        }
 
         app.UseAuthentication();
         app.UseAuthorization();
-
         app.MapControllers();
 
         if (!app.Environment.IsDevelopment())
-        {
             app.MapFallbackToFile("index.html");
-        }
 
         await app.RunAsync();
     }
