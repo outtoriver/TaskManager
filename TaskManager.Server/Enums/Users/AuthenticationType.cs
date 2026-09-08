@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Server.Enums.Tasks;
+﻿namespace TaskManager.Server.Enums.Users;
 
 public enum AuthenticationType
 {

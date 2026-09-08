@@ -1,4 +1,4 @@
-﻿using TaskManager.Server.Enums.Tasks;
+﻿using TaskManager.Server.Enums.Users;
 using TaskManager.Server.Models.Departments;
 using TaskManager.Server.Models.Positions;
 using TaskManager.Server.Models.Roles;
